@@ -8,7 +8,11 @@ def raidenHello():
 def alexHello():
   return "Hello World, it is Alex"
 
+def adamHello():
+  return "Hello World, it is Adam!"
+
 if __name__ == "__main__":
   print(wadeHello())
   print(raidenHello())
   print(alexHello())
+  print(adamHello())
