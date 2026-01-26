@@ -1,21 +1,23 @@
-import { Text, View,  StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView } from "react-native";
+import { mockCampsites } from "@/src/api/mockCampsites";
 
-export default function Index() {
+export default function CampsiteScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Campsites Screen</Text>
-    </View>
+    // Creates safe area so the campsites aren't displayed in the status bar
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#25292e"}}>
+      
+      <View style={{ padding: 16, flexDirection: "column", gap: 12 }}>
+            {mockCampsites.map((c) => (
+              <View key={c.id} style={{ paddingVertical: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>{c.name}</Text>
+                <Text style={{ opacity: 0.8, color: "#ccc" }}>
+                  {c.type} • {c.amenities.join(", ")}
+                </Text>
+                {c.notes ? <Text style={{ opacity: 0.7, color: "#aaa" }}>{c.notes}</Text> : null}
+              </View>
+            ))}
+          </View>
+      </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#25292e',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    color: '#fff',
-  },
-});
