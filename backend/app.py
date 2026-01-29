@@ -1,6 +1,7 @@
 from flask import Flask
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from routes.trip_routes import trip_bp, init_routes
 import os
 
 load_dotenv()
@@ -13,8 +14,6 @@ db = client[DATABASE_NAME]
 
 app = Flask(__name__)
 
-# Import and register trip routes
-from routes.trip_routes import trip_bp, init_routes
 init_routes(db)
 app.register_blueprint(trip_bp, url_prefix='/api')
 
