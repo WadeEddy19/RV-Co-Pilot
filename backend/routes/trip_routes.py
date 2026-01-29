@@ -7,8 +7,8 @@ trip_bp = Blueprint('trips', __name__)
 
 # db object passed in from app.py
 db = None
-
-def init_routes(database):
+# Changed from init_routes to init_trips_routes
+def init_trips_routes(database):
     """Initialize routes with database connection"""
     global db
     db = database
