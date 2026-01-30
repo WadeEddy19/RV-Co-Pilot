@@ -5,9 +5,24 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
+import { getAuth0Client } from '@/lib/auth0';
+
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    (async () => {
+      const auth0 = await getAuth0Client();
+      const isAuth = await auth0.isAuthenticated();
+
+      if (!isAuth) {
+        router.replace('/login' as any);
+      }
+    })();
+  }, []);
 
   return (
     <Tabs
