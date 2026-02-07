@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models.trip import Trip
 from bson import ObjectId
+from datetime import datetime
 
 # Create Blueprint for trip routes
 trip_bp = Blueprint('trips', __name__)
@@ -31,3 +32,55 @@ def create_trip():
     trip_dict['_id'] = str(result.inserted_id)
     
     return jsonify(trip_dict), 201
+
+@trip_bp.route('/trips/<trip_id>', methods=['PATCH'])
+def edit_trip(trip_id):
+    query = {"_id":ObjectId(trip_id)}
+    data = request.get_json()
+
+    update_data = {}
+
+    if 'name' in data:
+        update_data['name'] = data['name']
+
+    if 'campsite_ids' in data:
+        update_data['campsite_ids'] = data['campsite_ids']
+    
+    if not update_data:
+        return jsonify({"error": "No valid fields to update"}), 400
+
+    update_data['updated_at'] = datetime.utcnow()
+
+    result = db.trips.update_one(
+        query,
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Trip not found"}), 404
+
+    updated_trip = db.trips.find_one({"_id": ObjectId(trip_id)})
+    updated_trip['_id'] = str(updated_trip['_id'])
+
+    return jsonify(updated_trip), 200
+
+@trip_bp.route('/trips', methods=['GET'])
+def get_trips():
+    trips = list(db.trips.find({}, {"_id": 0}))
+    return jsonify(trips), 200
+
+@trip_bp.route('/trips/<trip_id>', methods=['GET'])
+def get_trip(trip_id):
+    query = {"_id":ObjectId(trip_id)}
+    trip = db.trips.find_one(query)
+
+    if not trip:
+        return jsonify({"error": "Trip not found!"}), 404
+    
+    trip['_id'] = str(trip['_id'])
+    return jsonify(trip), 200
+
+# @trip_bp.route('/trips/<trip_id>', methods=['DELETE'])
+# def delete_trip(trip_id):
+#     db.trips.delete_one({"_id":ObjectId(trip_id)})
+#     return
