@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models.campsite import Campsite
 from bson import ObjectId
+from datetime import datetime
 
 # Create Blueprint for campsite routes
 campsite_bp = Blueprint('campsites', __name__)
@@ -33,7 +34,18 @@ def create_campsite():
 
     return jsonify(campsite_dict), 201
 
+# Get all campsites
+@campsite_bp.route('/campsites', methods=['GET'])
+def get_campsites():
+    campsites = list(db.campsites.find({}, {"_id": 0}))
+    return jsonify(campsites), 200
 """
+USE THE FOLLOWING TO VIEW ALL CAMPSITES:
+Invoke-RestMethod http://127.0.0.1:5000/api/campsites
+"""
+
+"""
+USED THE FOLLOWING TO ADD CAMPSITE
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/campsites" `
   -ContentType "application/json" `
   -Body '{"campsite_id":"123","name":"Test Campsite", "latitude":"45", "longitude":"45"}'
