@@ -66,7 +66,10 @@ def edit_trip(trip_id):
 
 @trip_bp.route('/trips', methods=['GET'])
 def get_trips():
-    trips = list(db.trips.find({}, {"_id": 0}))
+    trips = list(db.trips.find({}))
+
+    for trip in trips:
+        trip['_id'] = str(trip['_id'])
     return jsonify(trips), 200
 
 @trip_bp.route('/trips/<trip_id>', methods=['GET'])
@@ -82,5 +85,12 @@ def get_trip(trip_id):
 
 # @trip_bp.route('/trips/<trip_id>', methods=['DELETE'])
 # def delete_trip(trip_id):
-#     db.trips.delete_one({"_id":ObjectId(trip_id)})
-#     return
+#     query = {"_id":ObjectId(trip_id)}
+#     result = db.trips.update_one(
+#         query,
+#         {"$set": {"is_deleted": True}}
+#     )
+#     if result.matched_count == 0:
+#         return jsonify({"error": "Trip not found"}), 404
+    
+#     return "", 204
