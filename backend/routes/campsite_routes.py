@@ -37,8 +37,28 @@ def create_campsite():
 # Get all campsites
 @campsite_bp.route('/campsites', methods=['GET'])
 def get_campsites():
-    campsites = list(db.campsites.find({}, {"_id": 0}))
+    campsites = list(db.campsites.find())
+    for campsite in campsites:
+        campsite['_id'] = str(campsite['_id'])
     return jsonify(campsites), 200
+
+# GET single campsite
+@campsite_bp.route('/campsites/<id>', methods=['GET'])
+def get_single_campsite(id):
+    try:
+        campsite = db.campsites.find_one({"_id": ObjectId(id)})
+
+        if not campsite:
+            return jsonify({"error": "Campsite not found"}), 404
+
+        # Convert ObjectId to string for JSON
+        campsite["_id"] = str(campsite["_id"])
+
+        return jsonify(campsite), 200
+
+    except:
+        return jsonify({"error": "Invalid campsite ID"}), 400
+
 """
 USE THE FOLLOWING TO VIEW ALL CAMPSITES:
 Invoke-RestMethod http://127.0.0.1:5000/api/campsites
