@@ -1,6 +1,6 @@
 /*
 Navigation hub for campsites
-Made with influence from AI
+Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 */
 
 import { Stack } from "expo-router";

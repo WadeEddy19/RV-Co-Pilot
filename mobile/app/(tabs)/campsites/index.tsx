@@ -1,15 +1,15 @@
 /*
 Shows a list of campsites and allows navigation to create screen
-Made with influence from AI
+Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 */
 import { useCallback, useState } from "react";
 import { View, Text, SafeAreaView, Pressable, ActivityIndicator } from "react-native"; // UI Stuff
 import { router } from "expo-router"; // Routing Purposes
-import { mockCampsites } from "@/src/api/mockCampsites";// Static Data for demonstration...for now
+import { mockCampsites } from "@/src/api/mockCampsites";
 import { apiFetch } from "@/lib/api";
 import { useFocusEffect } from "@react-navigation/native";
 
-
+// Campsite Structure
 type Campsite = {
   campsite_id: string;
   name: string;
@@ -22,25 +22,31 @@ type Campsite = {
 
 // Main page view
 export default function CampsiteScreen() {
+  // Fetching data, stores error if failure
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
+
+   // Stores campsite objects
    const [campsites, setCampsites] = useState<Campsite[]>([]);
 
+    // Gets campsites from the backend
     const load = async () => {
-    setError(null); // added: clear previous error before loading
-    setLoading(true); // added: start spinner
+    setError(null);
+    setLoading(true);
+    // Actual fetching process with error handling
     try {
-      const res = await apiFetch("/api/campsites"); // added: GET request to Flask backend
-      if (!res.ok) throw new Error(`GET /api/campsites failed: ${res.status}`); // added: guard against bad response
-      const data = (await res.json()) as Campsite[]; // added: parse response body
-      setCampsites(data); // added: store results in state
+      const res = await apiFetch("/api/campsites");
+      if (!res.ok) throw new Error(`GET /api/campsites failed: ${res.status}`);
+      const data = (await res.json()) as Campsite[];
+      setCampsites(data);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load campsites"); // added: show readable error
+      setError(e?.message ?? "Failed to load campsites");
     } finally {
-      setLoading(false); // added: stop spinner
+      setLoading(false);
     }
   };
 
+  // re-loads the screen 
   useFocusEffect(
     useCallback(() => {
       load();
@@ -48,7 +54,7 @@ export default function CampsiteScreen() {
   );
 
   return (
-    
+    // Page Layout
     <SafeAreaView style={{ flex: 1, backgroundColor: "#25292e" }}>
       <View style={{ padding: 16, gap: 12 }}>
         <Pressable // Create Campsite Button
@@ -69,7 +75,7 @@ export default function CampsiteScreen() {
 
        {!loading &&
           !error &&
-          campsites.map((c) => ( // changed: map over API data instead of mockCampsites
+          campsites.map((c) => (
             <View key={c.campsite_id} style={{ paddingVertical: 12 }}>
               <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>
                 {c.name}

@@ -1,7 +1,7 @@
 /*
 Create Campsite Screen
 User types in Campsite attributes and clicks Save
-Assisted by AI tool suggestions; code reviewed and modified
+Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 */
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, SafeAreaView } from "react-native";
@@ -12,33 +12,36 @@ import { apiFetch } from "@/lib/api";
 export default function CreateCampsiteScreen() {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
-  const [amenities, setAmenities] = useState(""); // comma separated
+  const [amenities, setAmenities] = useState("");
   const [notes, setNotes] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
-  const [saving, setSaving] = useState(false);
+  // Is save request running, helps prevent double submits and save error messages
+  const [saving, setSaving] = useState(false); 
   const [error, setError] = useState<string | null>(null);
 
-// Save Button
-const onSave = async () => { // changed: async so await works
-  setError(null); // unchanged
-  setSaving(true); // added: disable button + prevent double submit
+// Save Button, API calls await and sets saving to true to help prevent double submits
+const onSave = async () => { 
+  setError(null);
+  setSaving(true); 
 
-  try { // added: required for catch/finally below
+  // Error handling for inputs as well as cleans inputs
+  try {
     const nm = name.trim();
     const lat = Number(latitude);
     const lng = Number(longitude);
 
-    if (!nm) throw new Error("Name is required."); // changed: throw so we land in catch
+    if (!nm) throw new Error("Name is required."); 
     if (!Number.isFinite(lat)) throw new Error("Latitude must be a number.");
     if (!Number.isFinite(lng)) throw new Error("Longitude must be a number.");
 
+    // Object that is sent to API
     const payload = {
       campsite_id: String(Date.now()),
-      name: nm, // changed: reuse trimmed name
-      type: type.trim() || undefined, // changed: don’t send empty string
-      amenities: amenities // changed: parse to array
+      name: nm, 
+      type: type.trim() || undefined,
+      amenities: amenities 
         .split(",")
         .map((a) => a.trim())
         .filter(Boolean),
@@ -47,11 +50,13 @@ const onSave = async () => { // changed: async so await works
       notes: notes.trim() || undefined,
     };
 
+    // API Request itself
     const res = await apiFetch("/api/campsites", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
+    // Server error handling
     if (!res.ok) {
       const msg = await res.text();
       throw new Error(`Create failed (${res.status}): ${msg}`);
@@ -67,7 +72,7 @@ const onSave = async () => { // changed: async so await works
 
 
   return (
-    // Features: Campsite Name, Type, Amenities, Notes
+    // UI for features: Campsite Name, Type, Amenities, Notes, latitude, longitude
     <SafeAreaView style={{ flex: 1, backgroundColor: "#25292e" }}>
       <View style={{ padding: 16, gap: 12 }}>
         <Text style={{ color: "#fff", fontSize: 14, opacity: 0.9 }}>Name</Text>
@@ -152,7 +157,7 @@ const onSave = async () => { // changed: async so await works
 
         <Pressable // Save Button
           onPress={onSave}
-          disabled={saving} // added
+          disabled={saving} 
           style={{
             marginTop: 8,
             paddingVertical: 12,
