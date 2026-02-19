@@ -1,35 +1,26 @@
-create table if not exists users (
-  id bigserial primary key,
-  auth0_sub text unique not null,
-  email text,
+create table users (
+  auth0_sub text primary key,                 
+  name text,                                  
+  email text,                                 
+  avatar_url text,                            
   created_at timestamptz not null default now(),
-  last_login_at timestamptz
+  last_login_at timestamptz not null default now()
 );
 
-create table if not exists user_profiles (
-  id bigserial primary key,
-  user_id bigint not null references users(id) on delete cascade,
-  display_name text,
-  avatar_url text,
-  home_city text,
-  default_lat double precision,
-  default_lng double precision,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists saved_locations (
-  id bigserial primary key,
-  user_id bigint not null references users(id) on delete cascade,
+create table saved_locations (
+  auth0_sub text not null references users(auth0_sub) on delete cascade,
   campsite_id text not null,
   created_at timestamptz not null default now(),
-  unique(user_id, campsite_id)
+  primary key (auth0_sub, campsite_id)
 );
 
-create table if not exists user_notes (
-  id bigserial primary key,
-  user_id bigint not null references users(id) on delete cascade,
-  campsite_id text,
+create index if not exists idx_saved_locations_user on saved_locations(auth0_sub);
+
+create table user_notes (
+  id bigserial primary key,                   
+  auth0_sub text not null references users(auth0_sub) on delete cascade,
   note text not null,
   created_at timestamptz not null default now()
 );
+
+create index if not exists idx_user_notes_user on user_notes(auth0_sub);

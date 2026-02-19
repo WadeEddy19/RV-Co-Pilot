@@ -7,46 +7,63 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-} from 'react-native';
-import { getAuth0Client } from '@/lib/auth0';
-import { apiFetch } from '@/lib/api';
+  Platform,
+} from 'react-native'; 
+import { Ionicons } from '@expo/vector-icons'; 
+import { getAuth0Client } from '@/lib/auth0'; 
+import { apiFetch } from '@/lib/api'; 
+import { router } from 'expo-router'; 
+import { useRef } from 'react'; 
+
+
+// navigation when user selects a button on the profile screen. 
+const onEditProfile = () => router.push('/account/edit-profile'); 
+const onSavedTrips  = () => router.push('/account/saved-trips');  
+const onNotes       = () => router.push('/account/notes');        
+const onSettings    = () => router.push('/account/settings');     
+
+
 
 type ProfileResponse = {
-  user: { auth0_sub: string; email?: string };
-  profile: {
-    display_name?: string | null;
-    avatar_url?: string | null;
-    home_city?: string | null;
-    default_lat?: number | null;
-    default_lng?: number | null;
+  user: { auth0_sub: string; email?: string; name?: string }; // User info (Auth0 subject, email, name).
+  profile?: {
+    display_name?: string | null; 
+    avatar_url?: string | null;   
   };
-  saved_locations: string[];
-  notes: { id: number; campsite_id?: string | null; note: string; created_at: string }[];
+  saved_locations?: any; // Placeholder for saved location data
+  notes?: any; // Placeholder for notes data returned by the backend.
 };
 
-const PROFILE_IMAGE_URL = 'https://i.imgur.com/KATOpS6.jpg';
+const FALLBACK_AVATAR = 'https://i.imgur.com/KATOpS6.jpg'; // Default avatar image
 
 export default function ProfileScreen() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [loading, setLoading] = useState(true); // Tracks if profile data is currently loading.
+  const [error, setError] = useState<string | null>(null); // Stores any error message from loading/logout.
+  const [profile, setProfile] = useState<ProfileResponse | null>(null); // Stores the loaded profile response.
 
-  const displayName = useMemo(() => {
-    const name =
+  const fullName = useMemo(() => {
+    // best available name to display
+    return (
       profile?.profile?.display_name ||
-      profile?.user?.email ||
-      profile?.user?.auth0_sub ||
-      '';
-    return String(name);
+      profile?.user?.name ||
+      (profile?.user?.email ? profile.user.email.split('@')[0] : '') ||
+      'Account'
+    );
+  }, [profile]);
+
+  const email = useMemo(() => profile?.user?.email || '', [profile]); // Extracts the user's email for display.
+
+  const avatarUrl = useMemo(() => {
+    // Picks the user’s avatar URL from the profile or default image.
+    return profile?.profile?.avatar_url || FALLBACK_AVATAR;
   }, [profile]);
 
   const getApiAccessToken = async () => {
+    // Gets an Auth0 access token.
     const auth0 = await getAuth0Client();
     const audience = process.env.EXPO_PUBLIC_AUTH0_AUDIENCE;
 
-    if (!audience) {
-      throw new Error('Missing EXPO_PUBLIC_AUTH0_AUDIENCE in Expo env.');
-    }
+    if (!audience) throw new Error('Missing EXPO_PUBLIC_AUTH0_AUDIENCE.'); 
 
     return await auth0.getTokenSilently({
       authorizationParams: {
@@ -57,40 +74,35 @@ export default function ProfileScreen() {
   };
 
   const loadProfile = async () => {
+    // Loads the user and profile data from Auth0 and backend API.
     setError(null);
     setLoading(true);
 
     try {
-      const auth0 = await getAuth0Client();
-      const user = await auth0.getUser();
+      const auth0 = await getAuth0Client(); // Auth0 client for user/token calls.
+      const user = await auth0.getUser(); // Reads basic user info from Auth0.
 
       const userEmail = user?.email ?? '';
-      const userName =
-        user?.name || user?.nickname || user?.given_name || userEmail || '';
+      const userName = user?.name || user?.nickname || user?.given_name || userEmail || ''; 
 
-      const token = await getApiAccessToken();
+      const token = await getApiAccessToken(); 
 
       const res = await apiFetch('/api/profile', {
         headers: {
           Authorization: `Bearer ${token}`,
-          //used to populate neon database with user info. 
-          'X-User-Email': userEmail,
-          'X-User-Name': userName,
         },
-      });
+      }); // Calls backend profile endpoint with the bearer token.
 
-      const text = await res.text();
-      const json = text ? JSON.parse(text) : null;
+      const text = await res.text(); 
+      const json = text ? JSON.parse(text) : null; 
 
-      if (!res.ok) {
-        throw new Error(json?.error || `API error: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(json?.error || `API error: ${res.status}`); 
 
-      setProfile(json);
+      setProfile(json); 
     } catch (e: any) {
-      console.error('Profile load failed', e);
+      console.error('Profile load failed', e); 
       setError(e?.message || String(e));
-      setProfile(null);
+      setProfile(null); 
     } finally {
       setLoading(false);
     }
@@ -101,193 +113,298 @@ export default function ProfileScreen() {
   }, []);
 
   const logout = async () => {
+    // Logs the user out via Auth0
     try {
       const auth0 = await getAuth0Client();
-      localStorage.setItem('just_logged_out', '1');
+      if (typeof localStorage !== 'undefined') localStorage.setItem('just_logged_out', '1'); 
 
       await auth0.logout({
         logoutParams: {
           returnTo: window.location.origin,
         },
-      });
+      }); // Executes the Auth0 logout.
     } catch (e) {
-      console.error('Logout failed', e);
-      alert('Logout failed. Check console.');
+      console.error('Logout failed', e); 
+      alert('Logout failed.'); 
     }
   };
 
-  // Button actions to navigate the profile sub menues. 
-  const goProfile = () => {}; 
-  const goSavedLocations = () => {};
-  const goNotes = () => {};
-  const goSettings = () => {};
+
+  const onChangeAvatar = () => {
+    // Placeholder handler for adding avatar upload/change logic later.
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {}
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.welcome}>
-          Welcome{displayName ? ` ${displayName}` : ''}
-        </Text>
+        <View style={styles.headerTopRow}>
+          <Pressable onPress={() => {}} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="chevron-back" size={22} color="#fff" />
+          </Pressable>
 
-        {/* temp profile image will be able to update it to Avatar image */}
-        <View style={styles.heroWrap}>
-          <Image
-            source={{ uri: PROFILE_IMAGE_URL }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
+          <Text style={styles.headerTitle}>Account</Text>
+
+          <Pressable onPress={() => {}} style={styles.iconBtn} accessibilityRole="button">
+            <Ionicons name="settings-outline" size={20} color="#fff" />
+          </Pressable>
+        </View>
+
+        <View style={styles.profileBlock}>
+          <View style={styles.avatarWrap}>
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} /> {}
+
+            {/* Camera badge */}
+            <Pressable onPress={onChangeAvatar} style={styles.cameraBadge} accessibilityRole="button">
+              <Ionicons name="camera" size={14} color="#111827" />
+            </Pressable>
+          </View>
+
+          <Text style={styles.nameText} numberOfLines={1}>
+            {fullName} {}
+          </Text>
+
+          {!!email && (
+            <Text style={styles.emailText} numberOfLines={1}>
+              {email} {}
+            </Text>
+          )}
+
+          {loading ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.loadingText}>Loading…</Text>
+            </View>
+          ) : null} {}
+
+          {error ? <Text style={styles.errorText}>Error: {error}</Text> : null} {}
         </View>
       </View>
 
-      {/* Status message */}
-      {loading ? (
-        <View style={styles.statusRow}>
-          <ActivityIndicator />
-          <Text style={styles.statusText}>Loading…</Text>
-        </View>
-      ) : null}
+      {}
+      <View style={styles.cardsWrap}>
+        <Card>
+          <Row icon="create-outline" label="Edit Profile" onPress={onEditProfile} /> {}
+          <Row icon="create-outline" label="Saved Trips" onPress={onSavedTrips} />   {}
+          <Row icon="text-outline" label="Notes" onPress={onNotes} />              {}
+          <Row icon="settings-outline" label="Settings" onPress={onSettings} />    {}
+        </Card>
 
-      {error ? <Text style={styles.error}>Error: {error}</Text> : null}
-
-      {/* Menu buttons */}
-      <View style={styles.menu}>
-        <MenuButton label="Profile" onPress={goProfile} />
-        <MenuButton label="Saved locations" onPress={goSavedLocations} />
-        <MenuButton label="Notes" onPress={goNotes} />
-        <MenuButton label="Settings" onPress={goSettings} />
-        <MenuButton label="Log out" onPress={logout} danger />
+        {}
+        <Pressable onPress={logout} style={styles.logoutRow} accessibilityRole="button">
+          <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </Pressable> {}
       </View>
-
-      {}
-      {}
     </ScrollView>
   );
 }
-// Menu button component for profile sub menus
-function MenuButton({
+
+
+function Card({ children }: { children: React.ReactNode }) {
+  return <View style={styles.card}>{children}</View>; 
+}
+
+function Row({
+  icon,
   label,
   onPress,
-  danger,
 }: {
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
-  danger?: boolean;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.menuItem,
-        pressed && { transform: [{ scale: 0.99 }], opacity: 0.95 },
-        danger && styles.menuItemDanger,
-      ]}
-    >
-      <Text style={[styles.menuText, danger && styles.menuTextDanger]}>{label}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+      <View style={styles.rowLeft}>
+        <View style={styles.rowIcon}>
+          <Ionicons name={icon} size={18} color="#6b7280" />
+        </View>
+        <Text style={styles.rowLabel}>{label}</Text>
+      </View>
+
+      <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
     </Pressable>
   );
 }
 
-const CONTENT_WIDTH = 280;
 const styles = StyleSheet.create({
+  // layout colors and spacing for the screen.
   container: {
     flex: 1,
-    backgroundColor: '#f7f6f2',
+    backgroundColor: '#030535',
   },
   content: {
-    paddingBottom: 22,
+    paddingBottom: 26,
   },
 
+  // specific spacing.
   header: {
-  paddingTop: 18,
-  paddingHorizontal: 18,
-  paddingBottom: 22,
-  borderBottomLeftRadius: 24,
-  borderBottomRightRadius: 24,
-  backgroundColor: 'transparent',
-  alignItems: 'center',    
-  justifyContent: 'center',
+    backgroundColor: '#030535',
+    paddingTop: Platform.OS === 'ios' ? 18 : 18,
+    paddingHorizontal: 16,
+    paddingBottom: 18,
+  },
+
+  // Top row that holds back button, title, and settings button.
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
   },
   headerTitle: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+
+  // Centered profile section that shows avatar, name, email, and status text.
+  profileBlock: {
+    alignItems: 'center',
+    paddingTop: 18,
+  },
+
+  // Avatar and camera badge positioning.
+  avatarWrap: {
+    position: 'relative',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatar: {
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0b0b0f',
+  },
+
+  nameText: {
+    marginTop: 12,
+    color: '#ffffff',
     fontSize: 18,
+    fontWeight: '800',
+  },
+  emailText: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Loading and error message.
+  loadingRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  errorText: {
+    marginTop: 10,
+    color: '#fca5a5',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 14,
+  },
+
+  cardsWrap: {
+    backgroundColor: '#eef2ff00',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+
+  row: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eef2f7',
+  },
+  rowPressed: {
+    backgroundColor: '#f6f7fb',
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: {
+    color: '#111827',
+    fontSize: 14,
     fontWeight: '700',
   },
-  welcome: {
-  marginTop: 6,
-  color: 'rgb(0, 0, 0)',
-  fontSize: 20,
-  fontWeight: '800',
-  textAlign: 'center',         
-},
 
-  heroWrap: {
-  marginTop: 20,
-  width: CONTENT_WIDTH + 10,   
-  height: CONTENT_WIDTH + 20,
-  borderRadius: 24,
-  overflow: 'hidden',
-},
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  statusRow: {
+  // Logout button styling and layout.
+  logoutRow: {
+    marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
   },
-  statusText: {
-    color: '#374151',
-    fontSize: 13,
-  },
-  error: {
-    color: '#b91c1c',
-    fontSize: 13,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-  },
-
-  menu: {
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    gap: 10,
-  },
-
- // Menu button Styles. 
-  menuItem: {
-  width: CONTENT_WIDTH,   
-  backgroundColor: '#dd9536',
-  borderRadius: 14,
-  paddingVertical: 14,
-  paddingHorizontal: 16,
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  shadowColor: '#000',
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 6 },
-},
-  menuText: {
-    color: '#1f2937',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
-  menuItemDanger: {
-    backgroundColor: '#c24721',
-  },
-  menuTextDanger: {
-    color: '#000000',
-  },
-
-  debug: {
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    color: '#6b7280',
-    fontSize: 12,
+  logoutText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
