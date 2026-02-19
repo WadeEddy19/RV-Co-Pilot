@@ -14,6 +14,9 @@ client = MongoClient(MONGODB_URI)
 db = client[DATABASE_NAME]
 
 app = Flask(__name__)
+from flask_cors import CORS  # add
+CORS(app)                   # add
+
 
 init_trips_routes(db)
 app.register_blueprint(trip_bp, url_prefix='/api')
