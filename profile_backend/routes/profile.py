@@ -1,4 +1,4 @@
-# profile enpoints and helpers for user profile management 
+# profile enpoints for user profile management 
 # creates and updates user and user_profile records on login 
 # returns user profile data after authentication. 
 from flask import Blueprint, request, jsonify
@@ -11,15 +11,6 @@ def upsert_user(auth0_sub: str, email: str | None, name: str | None = None):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                INSERT INTO users (auth0_sub, email, last_login_at)
-                VALUES (%s, %s, NOW())
-                ON CONFLICT (auth0_sub)
-                DO UPDATE SET
-                    email = COALESCE(excluded.email, users.email),
-                    last_login_at = NOW()
-                RETURNING id;
-                """,
                 (auth0_sub, email),
             )
             user_id = cur.fetchone()[0]
@@ -61,11 +52,6 @@ def get_profile():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                select display_name, avatar_url, home_city, default_lat, default_lng
-                from user_profiles
-                where user_id=%s;
-                """,
                 (user_id,),
             )
             profile = cur.fetchone()
