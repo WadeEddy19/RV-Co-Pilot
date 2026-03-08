@@ -7,16 +7,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Modal,
   TextInput,
-  Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
-import { Collapsible } from '@/components/ui/collapsible';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { red } from 'react-native-reanimated/lib/typescript/Colors';
 
 type Trip = {
   _id: string;
@@ -33,6 +28,10 @@ export default function TripsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [newTripName, setNewTripName] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editTripName, setEditTripName] = useState('');
 
   const load = async () => {
   setError(null);
@@ -68,6 +67,37 @@ export default function TripsScreen() {
     }
   };
 
+  const handleDeleteTrip = async (tripId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this trip?');
+    if (!confirmed) return;
+    try {
+      const res = await apiFetch(`/api/trips/${tripId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`DELETE /api/trips failed: ${res.status}`);
+      load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to delete trip');
+    }
+  };
+
+  const handleEditTrip = async () => {
+    if (!editTripName.trim()) return;
+    try {
+      const res = await apiFetch(`/api/trips/${selectedTrip?._id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editTripName,
+        }),
+      });
+      if (!res.ok) throw new Error(`PATCH /api/trips failed: ${res.status}`);
+      setEditModalVisible(false);
+      load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to edit trip');
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -78,17 +108,34 @@ export default function TripsScreen() {
     <View style={styles.container}>
       <Text style={styles.headerTitle}>My Trips</Text>
       
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={{ color: '#f87171' }}>{error}</Text> : null}
+        {!loading && !error && trips.length === 0 && (
+          <Text style={{ color: '#aaaaaa', textAlign: 'center', marginTop: '15%', fontSize: 18 }}>
+            No trips yet. Create one to get started!
+          </Text>
+        )}
         {trips.map((trip) => (
           <View key={trip._id} style={styles.tripCard}>
             <View style={styles.tripCardHeader}>
               <Text style={styles.tripTitle}>{trip.name}</Text>
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={() => {
+                  setSelectedTrip(trip);
+                  setMenuVisible(true);
+                }}>
+                <Text style={styles.menuDots}>⋮</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tripContentContainer}>
+              <Text style={styles.tripContent}>• Madison Campground</Text>
+              <Text style={styles.tripContent}>• Bridge Bay Campground</Text>
             </View>
           </View>
         ))}
-      </View>
+      </ScrollView>
 
       <TouchableOpacity style={styles.button} onPress={() => setModalVisible(true)}>
         <Text style={styles.buttonText}>+ CREATE A TRIP</Text>
@@ -116,6 +163,51 @@ export default function TripsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={editModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Edit Trip Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Trip name"
+              placeholderTextColor="#888"
+              value={editTripName}
+              onChangeText={setEditTripName}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleEditTrip}>
+                <Text style={styles.confirmText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={menuVisible} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.menuOverlay} 
+          onPress={() => setMenuVisible(false)}>
+          <View style={styles.menuBox}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => {
+              setMenuVisible(false);
+              setEditTripName(selectedTrip?.name ?? '');
+              setEditModalVisible(true);
+            }}>
+              <Text style={styles.menuItemText}>✏️ Edit Name</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => {
+              setMenuVisible(false);
+              if (selectedTrip) handleDeleteTrip(selectedTrip._id);
+            }}>
+              <Text style={styles.menuItemTextDelete}>🗑️ Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -124,60 +216,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'column',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#25292e',
-    paddingTop: 30,
+    paddingTop: 20,
     paddingHorizontal: 16,
-    paddingBottom: 0,
   },
   content: {
-    flex: 1,
     width: '100%',
+    flexGrow: 1,
   },
   text: {
     color: '#fff',
   },
   headerTitle: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 30,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    letterSpacing: 2,
     marginBottom: 20,
+    width: '100%',
+    textAlign: 'left',
+    marginLeft: 25,
+    paddingBottom: 10
   },
   tripCard: {
-    backgroundColor: '#3949ab',
+    backgroundColor: '#2f3136',
     borderRadius: 10,
     marginBottom: 12,
     width: '100%',
     overflow: 'hidden',
   },
   tripCardHeader: {
-    backgroundColor: 'white',
+    backgroundColor: '#383c43',
     padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tripTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'black',
+    color: '#ffffff',
     textAlign: 'center',
   },
   tripContentContainer: {
     flexDirection: 'column',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   tripContent: {
     fontSize: 15,
-    color: 'white',
+    color: '#aaaaaa',
     margin: 20,
   },
   button: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#22c55e',
     borderRadius: 10,
     padding: 14,
     alignItems: 'center',
     width: '100%',
-    marginBottom: 20
+    marginBottom: 5,
   },
   buttonText: {
     color: '#ffffff',
@@ -230,5 +327,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     padding: 10,
     borderRadius: 8
-  }
+  },
+  deleteButton: {
+    position: 'absolute',
+    right: 12,
+    backgroundColor: '#ff0000',
+    padding: 5,
+    borderRadius: 8
+  },
+  deleteText: {
+    fontSize: 18,
+    color: '#ffffff'
+  },
+  menuButton: {
+    position: 'absolute',
+    right: 12,
+  },
+  menuDots: {
+    fontSize: 22,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  menuBox: {
+    position: 'absolute',
+    right: 16,
+    top: 100,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 8,
+    width: 150,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  menuItem: {
+    padding: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#000',
+    fontWeight: '600',
+  },
+  menuItemTextDelete: {
+    fontSize: 15,
+    color: '#000',
+    fontWeight: '600',
+  },
 });
