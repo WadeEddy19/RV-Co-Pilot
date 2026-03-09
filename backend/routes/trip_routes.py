@@ -35,7 +35,7 @@ def create_trip():
 
 @trip_bp.route('/trips/<trip_id>', methods=['PATCH'])
 def edit_trip(trip_id):
-    query = {"_id":ObjectId(trip_id)}
+    query = {"_id": ObjectId(trip_id), "is_deleted": {"$ne": True}}
     data = request.get_json()
 
     update_data = {}
@@ -66,7 +66,7 @@ def edit_trip(trip_id):
 
 @trip_bp.route('/trips', methods=['GET'])
 def get_trips():
-    trips = list(db.trips.find({}))
+    trips = list(db.trips.find({"is_deleted": {"$ne": True}}))
 
     for trip in trips:
         trip['_id'] = str(trip['_id'])
@@ -74,7 +74,7 @@ def get_trips():
 
 @trip_bp.route('/trips/<trip_id>', methods=['GET'])
 def get_trip(trip_id):
-    query = {"_id":ObjectId(trip_id)}
+    query = {"_id": ObjectId(trip_id), "is_deleted": {"$ne": True}}
     trip = db.trips.find_one(query)
 
     if not trip:
@@ -83,14 +83,23 @@ def get_trip(trip_id):
     trip['_id'] = str(trip['_id'])
     return jsonify(trip), 200
 
-# @trip_bp.route('/trips/<trip_id>', methods=['DELETE'])
-# def delete_trip(trip_id):
-#     query = {"_id":ObjectId(trip_id)}
-#     result = db.trips.update_one(
-#         query,
-#         {"$set": {"is_deleted": True}}
-#     )
-#     if result.matched_count == 0:
-#         return jsonify({"error": "Trip not found"}), 404
+@trip_bp.route('/trips/user/<user_id>', methods=['GET'])
+def get_trips_by_user(user_id):
+    trips = list(db.trips.find({"user_id": user_id, "is_deleted": {"$ne": True}}))
+
+    for trip in trips:
+        trip['_id'] = str(trip['_id'])
     
-#     return "", 204
+    return jsonify(trips), 200
+
+@trip_bp.route('/trips/<trip_id>', methods=['DELETE'])
+def delete_trip(trip_id):
+    query = {"_id":ObjectId(trip_id)}
+    result = db.trips.update_one(
+        query,
+        {"$set": {"is_deleted": True}}
+    )
+    if result.matched_count == 0:
+        return jsonify({"error": "Trip not found"}), 404
+    
+    return "", 204
