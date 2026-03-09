@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Text,
   View,
@@ -12,8 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons'; 
 import { getAuth0Client } from '@/lib/auth0'; 
 import { apiFetch } from '@/lib/api'; 
-import { router } from 'expo-router'; 
-import { useRef } from 'react'; 
+import { router, useFocusEffect } from 'expo-router'; 
+import * as ImagePicker from 'expo-image-picker';
+
 
 
 // navigation when user selects a button on the profile screen. 
@@ -25,13 +26,14 @@ const onSettings    = () => router.push('/account/settings');
 
 
 type ProfileResponse = {
-  user: { auth0_sub: string; email?: string; name?: string }; // User info (Auth0 subject, email, name).
-  profile?: {
-    display_name?: string | null; 
-    avatar_url?: string | null;   
+  user: {
+    auth0_sub: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string | null;
   };
-  saved_locations?: any; // Placeholder for saved location data
-  notes?: any; // Placeholder for notes data returned by the backend.
+  saved_locations?: any;
+  notes?: any;
 };
 
 const FALLBACK_AVATAR = 'https://i.imgur.com/KATOpS6.jpg'; // Default avatar image
@@ -41,21 +43,24 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null); // Stores any error message from loading/logout.
   const [profile, setProfile] = useState<ProfileResponse | null>(null); // Stores the loaded profile response.
 
-  const fullName = useMemo(() => {
-    // best available name to display
-    return (
-      profile?.profile?.display_name ||
-      profile?.user?.name ||
-      (profile?.user?.email ? profile.user.email.split('@')[0] : '') ||
-      'Account'
-    );
-  }, [profile]);
+const fullName = useMemo(() => {
+  return (
+    profile?.user?.name ||
+    (profile?.user?.email ? profile.user.email.split('@')[0] : '') ||
+    'Account'
+  );
+}, [profile]);
 
   const email = useMemo(() => profile?.user?.email || '', [profile]); // Extracts the user's email for display.
 
   const avatarUrl = useMemo(() => {
-    // Picks the user’s avatar URL from the profile or default image.
-    return profile?.profile?.avatar_url || FALLBACK_AVATAR;
+    const url = profile?.user?.avatar_url;
+
+    if (!url || url.trim() === '') {
+      return FALLBACK_AVATAR;
+    }
+
+    return url;
   }, [profile]);
 
   const getApiAccessToken = async () => {
@@ -108,9 +113,11 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
+useFocusEffect(
+  useCallback(() => {
     loadProfile();
-  }, []);
+  }, [])
+);
 
   const logout = async () => {
     // Logs the user out via Auth0
@@ -130,9 +137,94 @@ export default function ProfileScreen() {
   };
 
 
-  const onChangeAvatar = () => {
-    // Placeholder handler for adding avatar upload/change logic later.
-  };
+ const onChangeAvatar = async () => {
+  try {
+    if (Platform.OS !== 'web') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        alert('Please allow photo library access to choose an avatar.');
+        return;
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    const fileUri = asset.uri;
+    const mimeType = asset.mimeType || 'image/jpeg';
+    const fileSize = asset.fileSize || 0;
+
+    setLoading(true);
+    setError(null);
+
+    const presignRes = await apiFetch('/api/r2/avatar-upload-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        content_type: mimeType,
+        file_size_bytes: fileSize,
+      }),
+    });
+
+    const presignData = await presignRes.json();
+
+    if (!presignRes.ok) {
+      throw new Error(presignData.error || 'Failed to get upload URL');
+    }
+
+    const { upload_url, public_url } = presignData;
+
+    const fileResponse = await fetch(fileUri);
+    const fileBlob = await fileResponse.blob();
+
+    const uploadRes = await fetch(upload_url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mimeType,
+      },
+      body: fileBlob,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error('Upload to Cloudflare R2 failed');
+    }
+
+    const saveRes = await apiFetch('/api/profile/avatar', {
+      method: 'POST',
+      body: JSON.stringify({
+        avatar_url: public_url,
+      }),
+    });
+
+    const saveData = await saveRes.json();
+
+    if (!saveRes.ok) {
+      throw new Error(saveData.error || 'Failed to save avatar');
+    }
+
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            user: {
+              ...prev.user,
+              avatar_url: public_url,
+            },
+          }
+        : prev
+    );
+  } catch (e: any) {
+    console.error('Avatar upload failed', e);
+    setError(e?.message || 'Avatar upload failed');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
