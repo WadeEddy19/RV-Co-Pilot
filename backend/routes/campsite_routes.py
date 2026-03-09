@@ -109,7 +109,7 @@ Invoke-RestMethod -Method Patch `
 @campsite_bp.route('/campsites/<id>', methods=['GET'])
 def get_single_campsite(id):
     try:
-        campsite = db.campsites.find_one({"_id": ObjectId(id)})
+        campsite = db.campsites.find_one({"campsite_id": id})
 
         if not campsite:
             return jsonify({"error": "Campsite not found"}), 404

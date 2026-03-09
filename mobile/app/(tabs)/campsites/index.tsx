@@ -1,6 +1,7 @@
 /*
 Shows a list of campsites and allows navigation to create screen
 Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
+Map points code added and maintained by Adam jennings
 */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import { mockCampsites } from "@/src/api/mockCampsites";
 import { apiFetch } from "@/lib/api";
 import { useFocusEffect } from "@react-navigation/native";
 import CampsiteMap, { CampsiteMapPoint } from "../../../components/campsites/CampsiteMap";
+
 
 // Campsite Structure
 type Campsite = {
@@ -49,7 +51,7 @@ export default function CampsiteScreen() {
     const longitude = typeof c.longitude === "number" ? c.longitude : Number(c.longitude);
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
-
+    // Campsite structure
     return [
       {
         id: c.campsite_id,
@@ -124,23 +126,34 @@ export default function CampsiteScreen() {
             {loading ? <ActivityIndicator /> : null}
             {error ? <Text style={{ color: "#f87171" }}>{error}</Text> : null}
 
-            {!loading && !error ? (
+            
+            {!loading && !error ? ( // Loading with spinner and error display
               <ScrollView contentContainerStyle={styles.listContent}>
-                {campsites.map((c) => (
+                {campsites.map((c) => ( // Campsite List Display
                   <Pressable
                     key={c.campsite_id}
-                    onPress={() => focusCampsite(c.campsite_id)}
+                    onPress={() => focusCampsite(c.campsite_id)} // Focus on campsite on the map
                     style={[
                       styles.campsiteRow,
                       selectedCampsiteId === c.campsite_id ? styles.campsiteRowActive : null,
                     ]}
                   >
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>
-                      {c.name}
-                    </Text>
-                    <Text style={{ opacity: 0.8, color: "#ccc" }}>
-                      {String(c.latitude)}, {String(c.longitude)}
-                    </Text>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>
+                          {c.name}
+                        </Text>
+                        <Text style={{ opacity: 0.8, color: "#ccc" }}>
+                          {String(c.latitude)}, {String(c.longitude)}
+                        </Text>
+                      </View>
+                      <Pressable // View button to navigate to campsite screen
+                        onPress={() => router.push(`/campsites/${c.campsite_id}` as any)}
+                                                style={styles.detailButton}
+                                        >
+                                        <Text style={styles.detailButtonText}>Full Details</Text>
+                                                              </Pressable>
+                    </View>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -215,5 +228,17 @@ const styles = StyleSheet.create({
   },
   mapPaneStack: {
     height: 320,
+  },
+  detailButton: {
+    marginLeft: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#3b82f6",
+  },
+  detailButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
