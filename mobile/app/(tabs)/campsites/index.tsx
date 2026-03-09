@@ -5,12 +5,12 @@ Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 import { useCallback, useState } from "react";
 import { View, Text, SafeAreaView, Pressable, ActivityIndicator } from "react-native"; // UI Stuff
 import { router } from "expo-router"; // Routing Purposes
-import { mockCampsites } from "@/src/api/mockCampsites";
 import { apiFetch } from "@/lib/api";
 import { useFocusEffect } from "@react-navigation/native";
 
 // Campsite Structure
 type Campsite = {
+  _id: string;
   campsite_id: string;
   name: string;
   latitude: number | string;
@@ -72,18 +72,32 @@ export default function CampsiteScreen() {
 
         {loading ? <ActivityIndicator /> : null}
         {error ? <Text style={{ color: "#f87171" }}>{error}</Text> : null}
-
+ 
        {!loading &&
           !error &&
           campsites.map((c) => (
-            <View key={c.campsite_id} style={{ paddingVertical: 12 }}>
+            <Pressable
+              key={c._id}
+              onPress={() => router.push(`/campsites/${c._id}` as any)}
+              style={({ pressed }) => ({
+                paddingVertical: 14,
+                paddingHorizontal: 14,
+                backgroundColor: pressed ? "#374151" : "#1f2937",
+                borderRadius: 12,
+              })}
+            >
               <Text style={{ fontSize: 16, fontWeight: "600", color: "#fff" }}>
                 {c.name}
               </Text>
-              <Text style={{ opacity: 0.8, color: "#ccc" }}>
+              <Text style={{ opacity: 0.7, color: "#ccc", marginTop: 2 }}>
                 {String(c.latitude)}, {String(c.longitude)}
               </Text>
-            </View>
+              {!!c.campsite_type && (
+                <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 4 }}>
+                  {c.campsite_type}
+                </Text>
+              )}
+            </Pressable>
           ))}
       </View>
     </SafeAreaView>

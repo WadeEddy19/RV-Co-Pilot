@@ -22,11 +22,16 @@ def create_campsite():
     data = request.get_json()
     
     new_campsite = Campsite(
-        campsite_id=data['campsite_id'],
-        name=data['name'],
-        latitude=data['latitude'],
-        longitude=data['longitude']
-    )
+    campsite_id=data['campsite_id'],
+    name=data['name'],
+    latitude=data['latitude'],
+    longitude=data['longitude'],
+    campsite_type=data.get('campsite_type'),
+    amenities=data.get('amenities'),
+    notes=data.get('notes'),
+    is_private=data.get('is_private', False),
+    creator_id=data.get('creator_id')
+)
 
     # Convert to dictionary
     campsite_dict = new_campsite.to_dict()

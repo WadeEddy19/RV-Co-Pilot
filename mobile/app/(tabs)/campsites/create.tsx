@@ -37,18 +37,18 @@ const onSave = async () => {
     if (!Number.isFinite(lng)) throw new Error("Longitude must be a number.");
 
     // Object that is sent to API
-    const payload = {
-      campsite_id: String(Date.now()),
-      name: nm, 
-      type: type.trim() || undefined,
-      amenities: amenities 
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean),
-      latitude: lat,
-      longitude: lng,
-      notes: notes.trim() || undefined,
-    };
+  const payload = {
+    campsite_id: String(Date.now()),
+    name: nm,
+    campsite_type: type.trim() || undefined,
+    amenities: amenities
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean),
+    latitude: lat,
+    longitude: lng,
+    notes: notes.trim() || undefined,
+  };
 
     // API Request itself
     const res = await apiFetch("/api/campsites", {
