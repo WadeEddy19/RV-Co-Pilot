@@ -71,7 +71,7 @@ def _identity_from_request() -> dict:
     email = ui.get("email")
     return {"sub": sub, "name": name, "email": email}
 
-
+# retrieves profile page with user name and email. 
 def upsert_user_minimal(sub: str, name: str | None, email: str | None) -> str:
     if not sub:
         raise RuntimeError("Auth identity missing sub")
@@ -79,6 +79,15 @@ def upsert_user_minimal(sub: str, name: str | None, email: str | None) -> str:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
+                """
+                INSERT INTO users (auth0_sub, name, email, last_login_at)
+                VALUES (%s, %s, %s, now())
+                ON CONFLICT (auth0_sub)
+                DO UPDATE SET
+                    email = EXCLUDED.email,
+                    last_login_at = now()
+                RETURNING auth0_sub;
+                """,
                 (sub, name, email),
             )
             auth0_sub = cur.fetchone()[0]
@@ -89,14 +98,9 @@ def upsert_user_minimal(sub: str, name: str | None, email: str | None) -> str:
 
 # profile endpoint
 @app.get("/api/profile")
+@require_auth
 def get_profile():
     try:
-        try:
-            pass
-        except Exception:
-            pass
-
-        # identity via JWT, else /userinfo 
         identity = _identity_from_request()
         sub = identity["sub"]
         name = identity.get("name")
@@ -107,22 +111,48 @@ def get_profile():
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select auth0_sub, name, email, avatar_url, created_at, last_login_at from users where auth0_sub=%s;",
+                    """
+                    SELECT auth0_sub, name, email, avatar_url, created_at, last_login_at
+                    FROM users
+                    WHERE auth0_sub = %s;
+                    """,
                     (auth0_sub,),
                 )
                 user = cur.fetchone()
 
                 cur.execute(
-                    "select campsite_id, created_at from saved_locations where auth0_sub=%s order by created_at desc;",
+                    """
+                    SELECT campsite_id, created_at
+                    FROM saved_locations
+                    WHERE auth0_sub = %s
+                    ORDER BY created_at DESC;
+                    """,
                     (auth0_sub,),
                 )
-                saved = [{"campsite_id": r[0], "created_at": r[1].isoformat()} for r in cur.fetchall()]
+                saved = [
+                    {"campsite_id": r[0], "created_at": r[1].isoformat()}
+                    for r in cur.fetchall()
+                ]
 
                 cur.execute(
-                    "select id, note, created_at from user_notes where auth0_sub=%s order by created_at desc;",
+                    """
+                    SELECT id, title, note, created_at, updated_at
+                    FROM user_notes
+                    WHERE auth0_sub = %s
+                    ORDER BY updated_at DESC NULLS LAST, created_at DESC;
+                    """,
                     (auth0_sub,),
                 )
-                notes = [{"id": r[0], "note": r[1], "created_at": r[2].isoformat()} for r in cur.fetchall()]
+                notes = [
+                    {
+                        "id": r[0],
+                        "title": r[1],
+                        "note": r[2],
+                        "created_at": r[3].isoformat(),
+                        "updated_at": r[4].isoformat() if r[4] else None,
+                    }
+                    for r in cur.fetchall()
+                ]
 
         return jsonify({
             "user": {
@@ -134,7 +164,7 @@ def get_profile():
                 "last_login_at": user[5].isoformat(),
             },
             "saved_locations": saved,
-            "notes": notes
+            "notes": notes,
         })
 
     except Exception as e:
@@ -146,6 +176,7 @@ def get_profile():
 
 # avatar enpoint for uploading.
 @app.post("/api/r2/avatar-upload-url")
+@require_auth
 def avatar_upload_url():
     try:
         identity = _identity_from_request()
@@ -173,6 +204,7 @@ def avatar_upload_url():
 
 
 @app.post("/api/profile/avatar")
+@require_auth
 def set_avatar_url():
     try:
         identity = _identity_from_request()
@@ -202,6 +234,7 @@ def set_avatar_url():
 
 # saved locations endpoint
 @app.post("/api/saved-locations")
+@require_auth
 def add_saved_location():
     try:
         identity = _identity_from_request()
@@ -233,6 +266,7 @@ def add_saved_location():
 
 
 @app.delete("/api/saved-locations/<campsite_id>")
+@require_auth
 def delete_saved_location(campsite_id: str):
     try:
         identity = _identity_from_request()
@@ -256,33 +290,98 @@ def delete_saved_location(campsite_id: str):
 
 # notes endpoint 
 @app.post("/api/notes")
+@require_auth
 def add_note():
     try:
         identity = _identity_from_request()
-        auth0_sub = upsert_user_minimal(identity["sub"], identity.get("name"), identity.get("email"))
+        auth0_sub = upsert_user_minimal(
+            identity["sub"],
+            identity.get("name"),
+            identity.get("email"),
+        )
 
         body = request.get_json(force=True) or {}
-        note = body.get("note")
-        if not note:
-            return jsonify({"error": "note is required"}), 400
+        title = (body.get("title") or "").strip()
+        note = (body.get("note") or "").strip()
+
+        if not title:
+            return jsonify({"error": "title is required"}), 400
 
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    (auth0_sub, note),
+                    """
+                    INSERT INTO user_notes (auth0_sub, title, note, created_at, updated_at)
+                    VALUES (%s, %s, %s, now(), now())
+                    RETURNING id;
+                    """,
+                    (auth0_sub, title, note),
                 )
                 note_id = cur.fetchone()[0]
+
             conn.commit()
 
-        return jsonify({"ok": True, "note_id": note_id})
+        return jsonify({
+            "ok": True,
+            "note_id": note_id,
+            "title": title,
+            "note": note,
+        })
 
     except Exception as e:
         print("/api/notes failed:", repr(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# create note and refrence in database.     
+@app.put("/api/notes/<int:note_id>")
+@require_auth
+def update_note(note_id: int):
+    try:
+        identity = _identity_from_request()
+        auth0_sub = upsert_user_minimal(identity["sub"], identity.get("name"), identity.get("email"))
 
+        body = request.get_json(force=True) or {}
+        title = (body.get("title") or "").strip()
+        note = (body.get("note") or "").strip()
+
+        if not title:
+            return jsonify({"error": "title is required"}), 400
+
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE user_notes
+                    SET title = %s,
+                        note = %s,
+                        updated_at = now()
+                    WHERE id = %s AND auth0_sub = %s
+                    RETURNING id;
+                    """,
+                    (title, note, note_id, auth0_sub),
+                )
+                row = cur.fetchone()
+            conn.commit()
+
+        if not row:
+            return jsonify({"error": "note not found"}), 404
+
+        return jsonify({
+            "ok": True,
+            "note_id": note_id,
+            "title": title,
+            "note": note,
+        })
+
+    except Exception as e:
+        print("/api/notes/<id> failed:", repr(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# Delete note endpoint
 @app.delete("/api/notes/<int:note_id>")
+@require_auth
 def delete_note(note_id: int):
     try:
         identity = _identity_from_request()
@@ -303,6 +402,42 @@ def delete_note(note_id: int):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+#Update Profile name. 
+@app.post("/api/profile/name")
+@require_auth
+def set_display_name():
+    try:
+        identity = _identity_from_request()
+        auth0_sub = upsert_user_minimal(
+            identity["sub"],
+            identity.get("name"),
+            identity.get("email"),
+        )
+
+        body = request.get_json(force=True) or {}
+        name = (body.get("name") or "").strip()
+
+        if not name:
+            return jsonify({"error": "name is required"}), 400
+
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET name = %s
+                    WHERE auth0_sub = %s;
+                    """,
+                    (name, auth0_sub),
+                )
+            conn.commit()
+
+        return jsonify({"ok": True, "name": name})
+
+    except Exception as e:
+        print("/api/profile/name failed:", repr(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))

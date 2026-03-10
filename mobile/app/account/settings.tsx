@@ -22,8 +22,8 @@ export default function SettingsScreen() {
       <View style={styles.groups}>
         <Group>
           <Row label="Notification" right={<Switch value={notifications} onValueChange={setNotifications} />} />
-          <NavRow label="Privacy" onPress={() => {}} />
-          <NavRow label="About" onPress={() => {}} />
+          <NavRow label="Privacy" onPress={() => router.push('/account/privacy-page')} />
+          <NavRow label="About" onPress={() => router.push('/account/about-page')} />
         </Group>
       </View>
     </ScrollView>
