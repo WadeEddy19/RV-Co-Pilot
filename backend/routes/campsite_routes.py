@@ -25,7 +25,10 @@ def create_campsite():
         campsite_id=data['campsite_id'],
         name=data['name'],
         latitude=data['latitude'],
-        longitude=data['longitude']
+        longitude=data['longitude'],
+        campsite_type=data.get('campsite_type'),
+        amenities=data.get('amenities', []),
+        notes=data.get('notes')
     )
 
     # Convert to dictionary
