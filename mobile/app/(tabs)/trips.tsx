@@ -33,14 +33,38 @@ export default function TripsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editTripName, setEditTripName] = useState('');
 
+  // Linking campsites to trips using a lookup table
+  const [campsites, setCampsites] = useState<Record<string, string>>({});
+
+  // Load function responsible for fetching trips and campsites
   const load = async () => {
-  setError(null);
-  setLoading(true);
-  try {
-    const res = await apiFetch('/api/trips/user/user123');
-    if (!res.ok) throw new Error(`GET /api/trips/user failed: ${res.status}`);
-    const data = await res.json() as Trip[];
-    setTrips(data);
+    setError(null);
+    setLoading(true);
+    try {
+      // Fetch trips both trips and campsites
+      // Promise.all waits for both to finish before continuing
+      const [tripsRes, campsitesRes] = await Promise.all([
+        apiFetch('/api/trips/user/user123'),
+        apiFetch('/api/campsites'),
+      ]);
+
+      // Check both responses
+      if (!tripsRes.ok) throw new Error(`GET /api/trips/user failed: ${tripsRes.status}`);
+      if (!campsitesRes.ok) throw new Error(`GET /api/campsites failed: ${campsitesRes.status}`);
+
+      // Get campsite_id and name from the campsites
+      const tripsData = await tripsRes.json() as Trip[];
+      const campsitesData = await campsitesRes.json() as { campsite_id: string; name: string }[];
+
+
+      // Build the lookup table that allows to search for campsites without separate API calls
+      const lookup: Record<string, string> = {};
+      for (const c of campsitesData) {
+        lookup[c.campsite_id] = c.name;
+      }
+
+      setTrips(tripsData);
+      setCampsites(lookup);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load trips');
     } finally {
@@ -129,9 +153,18 @@ export default function TripsScreen() {
                 <Text style={styles.menuDots}>⋮</Text>
               </TouchableOpacity>
             </View>
+
+            {/*Show the trips campsites by gathering from the lookup*/}
             <View style={styles.tripContentContainer}>
-              <Text style={styles.tripContent}>• Madison Campground</Text>
-              <Text style={styles.tripContent}>• Bridge Bay Campground</Text>
+              {trip.campsite_ids && trip.campsite_ids.length > 0 ? (
+                trip.campsite_ids.map((id) => (
+                  <Text key={id} style={styles.tripContent}>
+                    • {campsites[id] ?? "Unknown campsite"}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.tripContent}>No campsites yet</Text>
+              )}
             </View>
           </View>
         ))}
