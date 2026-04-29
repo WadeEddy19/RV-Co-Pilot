@@ -1,3 +1,4 @@
+// Edits were made by Wade Eddy with AI assistance to connect campsites to trips.
 import { useState } from 'react';
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
