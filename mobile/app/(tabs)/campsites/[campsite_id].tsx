@@ -14,6 +14,7 @@ import {
   Pressable,
   Alert,
   TextInput,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { apiFetch } from "@/lib/api";
@@ -33,6 +34,13 @@ type Campsite = {
   updated_at?: string;
 };
 
+type Trip = {
+  _id: string;
+  name: string;
+  user_id: string;
+  campsite_ids: string[];
+};
+
 
 export default function CampsiteDetailScreen() {
   // Gather campsite object and handle loading
@@ -50,6 +58,12 @@ export default function CampsiteDetailScreen() {
   const [saving, setSaving] = useState(false);
   const [editLatitude, setEditLatitude] = useState("");
   const [editLongitude, setEditLongitude] = useState("");
+
+  // Add to trip
+  const [tripModalVisible, setTripModalVisible] = useState(false);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [addingToTrip, setAddingToTrip] = useState(false);
 
   // Fetch single campsite from backend with error handling
   useEffect(() => {
@@ -120,6 +134,43 @@ const handleSave = async () => {
   }
 };
 
+// Opens Add to Trip modal and loads this user's trips from the backend.
+const handleAddToTripOpen = async () => {
+  setTripModalVisible(true);
+  setLoadingTrips(true);
+  try {
+    // Replace with real Auth0
+    const res = await apiFetch("/api/trips/user/user123");
+    if (!res.ok) throw new Error(`Failed to load trips (${res.status})`);
+    const data = (await res.json()) as Trip[];
+    setTrips(data);
+  } catch (e: any) {
+    window.alert(e?.message ?? "Failed to load trips");
+    setTrips([]);
+  } finally {
+    setLoadingTrips(false);
+  }
+};
+
+// Actual adding process
+const handleAddToTrip = async (trip: Trip) => {
+  setAddingToTrip(true);
+  try {
+    const updatedIds = [...(trip.campsite_ids ?? []), campsite!.campsite_id];
+    const res = await apiFetch(`/api/trips/${trip._id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ campsite_ids: updatedIds }),
+    });
+    if (!res.ok) throw new Error(`Failed to add to trip (${res.status})`);
+    window.alert(`Added "${campsite!.name}" to "${trip.name}"`);
+    setTripModalVisible(false);
+  } catch (e: any) {
+    window.alert(e?.message ?? "Failed to add campsite to trip");
+  } finally {
+    setAddingToTrip(false);
+  }
+};
+
   if (loading) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -158,6 +209,9 @@ const handleSave = async () => {
             </Pressable>
             <Pressable onPress={handleDelete} style={[styles.actionButton, { backgroundColor: "#ef4444" }]}>
               <Text style={styles.actionButtonText}>Delete</Text>
+            </Pressable>
+            <Pressable onPress={handleAddToTripOpen} style={[styles.actionButton, { backgroundColor: "#3bf65a" }]}>
+              <Text style={styles.actionButtonText}>Add to Trip</Text>
             </Pressable>
           </View>
         </View>
@@ -224,9 +278,51 @@ const handleSave = async () => {
         </Section>
 
       </ScrollView>
+      {/* Add to Trip modal.
+          Shows a spinner while trips load, a friendly message if the user has no trips,
+          and a scrollable list of trips otherwise. Each trip is pressable to add this campsite. */}
+      <Modal visible={tripModalVisible} transparent animationType="fade" onRequestClose={() => setTripModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Add to Trip</Text>
+
+            {loadingTrips ? (
+              <ActivityIndicator color="#3b82f6" />
+            ) : trips.length === 0 ? (
+              <Text style={styles.emptyText}>No trips yet. Create one first.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {trips.map((trip) => (
+                  <Pressable
+                    key={trip._id}
+                    onPress={() => handleAddToTrip(trip)}
+                    disabled={addingToTrip}
+                    style={styles.tripOption}
+                  >
+                    <Text style={styles.tripOptionText}>{trip.name}</Text>
+                    <Text style={styles.tripOptionCount}>
+                      {trip.campsite_ids?.length ?? 0} campsite{(trip.campsite_ids?.length ?? 0) === 1 ? "" : "s"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
+            <Pressable
+              onPress={() => setTripModalVisible(false)}
+              style={[styles.actionButton, { backgroundColor: "#6b7280", alignItems: "center", marginTop: 12 }]}
+            >
+              <Text style={styles.actionButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+
+
 
 // helper components 
 
@@ -325,4 +421,50 @@ input: {
   tagText: { color: "#e5e7eb", fontSize: 13 },
 
   errorText: { color: "#f87171", fontSize: 15 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "85%",
+    maxWidth: 420,
+    backgroundColor: "#1f2937",
+    borderRadius: 14,
+    padding: 20,
+    gap: 10,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  emptyText: {
+    color: "#9ca3af",
+    fontSize: 14,
+    paddingVertical: 20,
+    textAlign: "center",
+  },
+  tripOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#374151",
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  tripOptionText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  tripOptionCount: {
+    color: "#9ca3af",
+    fontSize: 12,
+  },
 });

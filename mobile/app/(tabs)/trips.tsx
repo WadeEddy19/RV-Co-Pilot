@@ -1,3 +1,4 @@
+// Edits were made by Wade Eddy with AI assistance to connect campsites to trips.
 import { useState } from 'react';
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,6 +8,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Modal,
   TextInput,
   ActivityIndicator,
@@ -33,14 +35,38 @@ export default function TripsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editTripName, setEditTripName] = useState('');
 
+  // Linking campsites to trips using a lookup table
+  const [campsites, setCampsites] = useState<Record<string, string>>({});
+
+  // Load function responsible for fetching trips and campsites
   const load = async () => {
-  setError(null);
-  setLoading(true);
-  try {
-    const res = await apiFetch('/api/trips/user/user123');
-    if (!res.ok) throw new Error(`GET /api/trips/user failed: ${res.status}`);
-    const data = await res.json() as Trip[];
-    setTrips(data);
+    setError(null);
+    setLoading(true);
+    try {
+      // Fetch trips both trips and campsites
+      // Promise.all waits for both to finish before continuing
+      const [tripsRes, campsitesRes] = await Promise.all([
+        apiFetch('/api/trips/user/user123'),
+        apiFetch('/api/campsites'),
+      ]);
+
+      // Check both responses
+      if (!tripsRes.ok) throw new Error(`GET /api/trips/user failed: ${tripsRes.status}`);
+      if (!campsitesRes.ok) throw new Error(`GET /api/campsites failed: ${campsitesRes.status}`);
+
+      // Get campsite_id and name from the campsites
+      const tripsData = await tripsRes.json() as Trip[];
+      const campsitesData = await campsitesRes.json() as { campsite_id: string; name: string }[];
+
+
+      // Build the lookup table that allows to search for campsites without separate API calls
+      const lookup: Record<string, string> = {};
+      for (const c of campsitesData) {
+        lookup[c.campsite_id] = c.name;
+      }
+
+      setTrips(tripsData);
+      setCampsites(lookup);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load trips');
     } finally {
@@ -98,6 +124,24 @@ export default function TripsScreen() {
     }
   };
 
+  // Removes a campsite from a trip via its position in the trip's array.
+  const handleRemoveFromTrip = async (trip: Trip, indexToRemove: number) => {
+  try {
+    // Build a new array without the campsite at indexToRemove
+    const updatedIds = trip.campsite_ids.filter((_, i) => i !== indexToRemove);
+
+    const res = await apiFetch(`/api/trips/${trip._id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ campsite_ids: updatedIds }),
+    });
+
+    if (!res.ok) throw new Error(`PATCH /api/trips failed: ${res.status}`);
+    load();
+  } catch (e: any) {
+    setError(e?.message ?? 'Failed to remove campsite from trip');
+  }
+};
+
   useFocusEffect(
     useCallback(() => {
       load();
@@ -129,9 +173,25 @@ export default function TripsScreen() {
                 <Text style={styles.menuDots}>⋮</Text>
               </TouchableOpacity>
             </View>
+
+            {/*Show the trips campsites by gathering from the lookup*/}
             <View style={styles.tripContentContainer}>
-              <Text style={styles.tripContent}>• Madison Campground</Text>
-              <Text style={styles.tripContent}>• Bridge Bay Campground</Text>
+              {trip.campsite_ids && trip.campsite_ids.length > 0 ? (
+                trip.campsite_ids.map((id, index) => (
+                  // Each bullet is now a row so the X can sit beside the campsite name.
+                  // Key combines id+index because duplicates would collide on id alone.
+                  <View key={`${id}-${index}`} style={styles.campsiteRow}>
+                    <Text style={styles.tripContent}>
+                      • {campsites[id] ?? "Unknown campsite"}
+                    </Text>
+                    <Pressable onPress={() => handleRemoveFromTrip(trip, index)}>
+                      <Text style={styles.removeIcon}>✕</Text>
+                    </Pressable>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.tripContent}>No campsites yet</Text>
+              )}
             </View>
           </View>
         ))}
@@ -379,4 +439,17 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '600',
   },
+  campsiteRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+},
+  removeIcon: {
+  color: '#ef4444',
+  fontSize: 18,
+  fontWeight: '700',
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+},
 });
