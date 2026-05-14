@@ -1,23 +1,39 @@
 // global login screen that redirects to Auth0 for authentication
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
 import { getAuth0Client } from '@/lib/auth0';
-
-let redirecting = false;
 
 export default function LoginScreen() {
   useEffect(() => {
-    (async () => {
-      if (redirecting) return;
-      redirecting = true;
+    const startLogin = async () => {
+      try {
+        const auth0 = await getAuth0Client();
 
-      const auth0 = await getAuth0Client();
+        const isAuth = await auth0.isAuthenticated();
 
-      const isAuth = await auth0.isAuthenticated();
-      if (!isAuth) {
+        if (isAuth) {
+          router.replace('/(tabs)/campsites' as any);
+          return;
+        }
+
+        const alreadyStarted = sessionStorage.getItem('auth0_login_started');
+
+        if (alreadyStarted === 'true') {
+          console.log('Login already started, not redirecting again.');
+          return;
+        }
+
+        sessionStorage.setItem('auth0_login_started', 'true');
+
         await auth0.loginWithRedirect();
+      } catch (err) {
+        console.error('Login failed:', err);
+        sessionStorage.removeItem('auth0_login_started');
       }
-    })();
+    };
+
+    startLogin();
   }, []);
 
   return (

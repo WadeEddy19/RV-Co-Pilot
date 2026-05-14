@@ -6,7 +6,7 @@ import { useCallback, useState } from "react";
 import { View, Text, SafeAreaView, Pressable, ActivityIndicator } from "react-native"; // UI Stuff
 import { router } from "expo-router"; // Routing Purposes
 import { mockCampsites } from "@/src/api/mockCampsites";
-import { apiFetch } from "@/lib/api";
+import { apiFetch} from "@/lib/api";
 import { useFocusEffect } from "@react-navigation/native";
 
 // Campsite Structure
