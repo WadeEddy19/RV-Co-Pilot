@@ -29,4 +29,4 @@ def home():
     return {"message": "RV Co-Pilot Backend is running!"}
 
 if __name__ == '__main__':
-    app.run(debug=True, port=6000)
+    app.run(debug=True, port=5000)
