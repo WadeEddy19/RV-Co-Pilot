@@ -17,6 +17,7 @@ export default function CampsitesLayout() {
     >
       <Stack.Screen name="index" options={{ title: "Campsites" }} />
       <Stack.Screen name="create" options={{ title: "Create Campsite" }} />
+      <Stack.Screen name="[campsite_id]"   options={{ title: "Campsite Details" }} />
     </Stack>
   );
 }

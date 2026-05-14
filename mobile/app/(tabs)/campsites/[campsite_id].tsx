@@ -140,8 +140,6 @@ const handleDelete = async () => {
   }
 };
 
-
-
 // Edit and save edits with error handling
 const handleEditOpen = () => {
   setEditName(campsite!.name);
@@ -370,9 +368,6 @@ const handleAddToTrip = async (trip: Trip) => {
     </SafeAreaView>
   );
 }
-
-
-
 
 // helper components 
 

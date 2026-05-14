@@ -40,7 +40,7 @@ const onSave = async () => {
     const payload = {
       campsite_id: String(Date.now()),
       name: nm, 
-      type: type.trim() || undefined,
+      campsite_type: type.trim() || undefined,
       amenities: amenities 
         .split(",")
         .map((a) => a.trim())
@@ -154,6 +154,10 @@ const onSave = async () => {
             textAlignVertical: "top",
           }}
         />
+
+        {error && (
+  <Text style={{ color: "#f87171", fontSize: 13 }}>{error}</Text>
+        )}
 
         <Pressable // Save Button
           onPress={onSave}
