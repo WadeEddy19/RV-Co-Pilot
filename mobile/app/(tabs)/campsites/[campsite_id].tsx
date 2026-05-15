@@ -17,7 +17,7 @@ import {
   Modal,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { apiFetch} from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { getAuth0Client } from "@/lib/auth0";
 
@@ -43,6 +43,12 @@ type Trip = {
   campsite_ids: string[];
 };
 
+type AuthUser = {
+  sub?: string;
+  name?: string;
+  email?: string;
+};
+
 
 export default function CampsiteDetailScreen() {
   // Gather campsite object and handle loading
@@ -61,11 +67,33 @@ export default function CampsiteDetailScreen() {
   const [editLatitude, setEditLatitude] = useState("");
   const [editLongitude, setEditLongitude] = useState("");
 
+  // Auth user loaded once on mount, used to fetch this user's trips
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
   // Add to trip
   const [tripModalVisible, setTripModalVisible] = useState(false);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [addingToTrip, setAddingToTrip] = useState(false);
+
+  // Load the Auth0 user once on mount so we know who's logged in.
+  // Mirrors the pattern in trips.tsx
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const auth0 = await getAuth0Client();
+        const u = await auth0.getUser();
+        if (!cancelled) setAuthUser(u ?? null);
+      } catch {
+        if (!cancelled) setAuthUser(null);
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch single campsite from backend with error handling
   useEffect(() => {
@@ -179,11 +207,17 @@ const handleSave = async () => {
 
 // Opens Add to Trip modal and loads this user's trips from the backend.
 const handleAddToTripOpen = async () => {
+  // Fail if we don't have a logged in user
+  if (!authUser?.sub) {
+    window.alert("You must be signed in to add campsites to trips.");
+    return;
+  }
+
   setTripModalVisible(true);
   setLoadingTrips(true);
   try {
-    // Replace with real Auth0
-    const res = await apiFetch("/api/trips/user/user123");
+    const userPath = encodeURIComponent(authUser.sub);
+    const res = await apiFetch(`/api/trips/user/${userPath}`);
     if (!res.ok) throw new Error(`Failed to load trips (${res.status})`);
     const data = (await res.json()) as Trip[];
     setTrips(data);
@@ -253,8 +287,16 @@ const handleAddToTrip = async (trip: Trip) => {
             <Pressable onPress={handleDelete} style={[styles.actionButton, { backgroundColor: "#ef4444" }]}>
               <Text style={styles.actionButtonText}>Delete</Text>
             </Pressable>
-            <Pressable onPress={handleAddToTripOpen} style={[styles.actionButton, { backgroundColor: "#3bf65a" }]}>
-              <Text style={styles.actionButtonText}>Add to Trip</Text>
+            <Pressable
+                onPress={handleAddToTripOpen}
+                disabled={!authReady || !authUser?.sub}
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: "#22c55e" },
+                  (!authReady || !authUser?.sub) && { opacity: 0.5 },
+                ]}
+              >
+                <Text style={styles.actionButtonText}>Add to Trip</Text>
             </Pressable>
             <Pressable onPress={handleAddToFavorites}
                        style={[styles.actionButton, { backgroundColor: "#f59e0b" }]}
