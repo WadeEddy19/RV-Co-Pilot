@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify
 from models.campsite import Campsite
 from bson import ObjectId
 from datetime import datetime
-
+import base64
+import json
 # Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 # Heavily inspired and adapted from Raiden's work on trips.
 
@@ -12,6 +13,23 @@ campsite_bp = Blueprint('campsites', __name__)
 # db object passed in from app.py
 db = None
 
+# Copied from trips_routes.py
+def _get_user_sub_from_token():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:]
+    parts = token.split('.')
+    if len(parts) < 2:
+        return None
+    try:
+        payload_b64 = parts[1] + '=' * (-len(parts[1]) % 4)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_bytes)
+        return payload.get('sub')
+    except Exception:
+        return None
+
 def init_campsites_routes(database):
     """Initialize routes with database connection"""
     global db
@@ -20,7 +38,10 @@ def init_campsites_routes(database):
 @campsite_bp.route('/campsites', methods=['POST'])
 def create_campsite():
     data = request.get_json()
-    
+
+    token_sub = _get_user_sub_from_token()
+    user_id = token_sub or data.get('user_id')
+
     new_campsite = Campsite(
         campsite_id=data['campsite_id'],
         name=data['name'],
@@ -28,7 +49,9 @@ def create_campsite():
         longitude=data['longitude'],
         campsite_type=data.get('campsite_type'),
         amenities=data.get('amenities', []),
-        notes=data.get('notes')
+        notes=data.get('notes'),
+        is_private=data.get('is_private', False),
+        creator_id=user_id,
     )
 
     # Convert to dictionary
@@ -43,7 +66,20 @@ def create_campsite():
 # Get all campsites
 @campsite_bp.route('/campsites', methods=['GET'])
 def get_campsites():
-    campsites = list(db.campsites.find())
+    token_sub = _get_user_sub_from_token()
+    user_id = token_sub or request.args.get('user_id')
+
+    if user_id:
+        query = {
+            "$or": [
+                {"is_private": {"$ne": True}},
+                {"creator_id": user_id}
+            ]
+        }
+    else:
+        query = {"is_private": {"$ne": True}}
+
+    campsites = list(db.campsites.find(query))
     for campsite in campsites:
         campsite['_id'] = str(campsite['_id'])
     return jsonify(campsites), 200
@@ -117,9 +153,14 @@ def get_single_campsite(id):
         if not campsite:
             return jsonify({"error": "Campsite not found"}), 404
 
-        # Convert ObjectId to string for JSON
-        campsite["_id"] = str(campsite["_id"])
+        # Privacy check: private campsites only visible to their creator
+        if campsite.get("is_private"):
+            token_sub = _get_user_sub_from_token()
+            user_id = token_sub or request.args.get('user_id')
+            if user_id != campsite.get("creator_id"):
+                return jsonify({"error": "Campsite not found"}), 404
 
+        campsite["_id"] = str(campsite["_id"])
         return jsonify(campsite), 200
 
     except:
