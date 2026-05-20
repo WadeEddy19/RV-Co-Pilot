@@ -237,9 +237,7 @@ useFocusEffect(
 
           <Text style={styles.headerTitle}>Account</Text>
 
-          <Pressable onPress={() => {}} style={styles.iconBtn} accessibilityRole="button">
-            <Ionicons name="settings-outline" size={20} color="#fff" />
-          </Pressable>
+          <View style={{ width: 36 }} />
         </View>
 
         <View style={styles.profileBlock}>

@@ -18,8 +18,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { apiFetch } from "@/lib/api";
+import { Ionicons } from "@expo/vector-icons";
 import { getAuth0Client } from "@/lib/auth0";
-
 
 // Campsite Structure
 type Campsite = {
@@ -113,6 +113,47 @@ export default function CampsiteDetailScreen() {
     };
     if (campsite_id) load();
   }, [campsite_id]);
+
+const getApiAccessToken = async () => {
+  const auth0 = await getAuth0Client();
+  const audience = process.env.EXPO_PUBLIC_AUTH0_AUDIENCE;
+
+  if (!audience) throw new Error("Missing EXPO_PUBLIC_AUTH0_AUDIENCE.");
+
+  return await auth0.getTokenSilently({
+    authorizationParams: {
+      audience,
+      scope: "openid profile email offline_access",
+    },
+  });
+};
+
+const handleAddToFavorites = async () => {
+  try {
+    const token = await getApiAccessToken();
+
+    const res = await apiFetch("/api/saved-locations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        campsite_id: campsite!.campsite_id,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to add to favorites");
+    }
+
+    window.alert("Added to favorites ⭐");
+  } catch (err: any) {
+    console.error("Add to favorites failed:", err);
+    window.alert(err?.message || "Failed to add to favorites");
+  }
+};
 
 // Web Friendly delete
 const handleDelete = async () => {
@@ -257,6 +298,11 @@ const handleAddToTrip = async (trip: Trip) => {
               >
                 <Text style={styles.actionButtonText}>Add to Trip</Text>
             </Pressable>
+            <Pressable onPress={handleAddToFavorites}
+                       style={[styles.actionButton, { backgroundColor: "#f59e0b" }]}
+  >
+              <Ionicons name="star-outline" size={18} color="white" />
+            </Pressable>
           </View>
         </View>
 
@@ -364,9 +410,6 @@ const handleAddToTrip = async (trip: Trip) => {
     </SafeAreaView>
   );
 }
-
-
-
 
 // helper components 
 
@@ -511,4 +554,5 @@ input: {
     color: "#9ca3af",
     fontSize: 12,
   },
+
 });

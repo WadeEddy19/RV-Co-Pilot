@@ -16,8 +16,13 @@ app = Flask(__name__)
 
 CORS(
     app,
-    resources={r"/*": {"origins": os.environ.get("CORS_ORIGINS", "http://localhost:8081")}},
+    resources={r"/*": {"origins": [
+        "http://localhost:8081",
+        "http://localhost:19006",
+        "https://rv-gateway.onrender.com",
+    ]}},
     allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 )
 
 

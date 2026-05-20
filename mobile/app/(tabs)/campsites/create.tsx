@@ -6,7 +6,7 @@ Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, SafeAreaView } from "react-native";
 import { router } from "expo-router";
-import { apiFetch } from "@/lib/api";
+import { apiFetch} from "@/lib/api";
 
 // Beginning of the screen itself with attributes for user input
 export default function CreateCampsiteScreen() {
