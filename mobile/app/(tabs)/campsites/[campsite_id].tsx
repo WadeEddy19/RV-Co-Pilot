@@ -231,6 +231,11 @@ const handleAddToTripOpen = async () => {
 
 // Actual adding process
 const handleAddToTrip = async (trip: Trip) => {
+   // Stop if this campsite is already in the trip
+  if ((trip.campsite_ids ?? []).includes(campsite!.campsite_id)) {
+    window.alert("Campsite already in trip");
+    return;
+  }
   setAddingToTrip(true);
   try {
     const updatedIds = [...(trip.campsite_ids ?? []), campsite!.campsite_id];
