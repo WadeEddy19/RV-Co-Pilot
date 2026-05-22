@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from models.campsite import Campsite
 from bson import ObjectId
 from datetime import datetime
+import base64
+import json
 
 # Assisted by AI tool suggestions; code reviewed and modified by Wade Eddy
 # Heavily inspired and adapted from Raiden's work on trips.
@@ -17,10 +19,29 @@ def init_campsites_routes(database):
     global db
     db = database
 
+# Helper copied from trip_routes
+def _get_user_sub_from_token():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:]
+    parts = token.split('.')
+    if len(parts) < 2:
+        return None
+    try:
+        payload_b64 = parts[1] + '=' * (-len(parts[1]) % 4)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_bytes)
+        return payload.get('sub')
+    except Exception:
+        return None
+
 @campsite_bp.route('/campsites', methods=['POST'])
 def create_campsite():
     data = request.get_json()
     
+    token_sub = _get_user_sub_from_token()
+
     new_campsite = Campsite(
         campsite_id=data['campsite_id'],
         name=data['name'],
@@ -28,7 +49,8 @@ def create_campsite():
         longitude=data['longitude'],
         campsite_type=data.get('campsite_type'),
         amenities=data.get('amenities', []),
-        notes=data.get('notes')
+        notes=data.get('notes'),
+        creator_id=token_sub,
     )
 
     # Convert to dictionary
@@ -52,6 +74,16 @@ def get_campsites():
 @campsite_bp.route('/campsites/<campsite_id>', methods=['PATCH'])
 def edit_campsite(campsite_id):
     query = {"_id":ObjectId(campsite_id)}
+
+    # Altered from code in trip_routes
+    token_sub = _get_user_sub_from_token()
+    if token_sub:
+        existing = db.campsites.find_one(query)
+        if not existing:
+            return jsonify({"error": "Campsite not found"}), 404
+        if existing.get('creator_id') != token_sub:
+            return jsonify({"error": "Forbidden"}), 403
+
     data = request.get_json()
 
     update_data = {}
@@ -142,6 +174,14 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/campsites" `
 def delete_campsite(campsite_id):
     try:
         query = {"_id": ObjectId(campsite_id)}
+        # Copied From trip_routes
+        token_sub = _get_user_sub_from_token()
+        if token_sub:
+            existing = db.campsites.find_one(query)
+            if not existing:
+                return jsonify({"error": "Campsite not found"}), 404
+            if existing.get('creator_id') != token_sub:
+                return jsonify({"error": "Forbidden"}), 403
     except:
         return jsonify({"error": "Invalid Campsite ID"}), 400
     
