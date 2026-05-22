@@ -34,6 +34,7 @@ type Campsite = {
   is_private?: boolean;
   created_at?: string;
   updated_at?: string;
+  creator_id?: string | null;
 };
 
 type Trip = {
@@ -231,6 +232,11 @@ const handleAddToTripOpen = async () => {
 
 // Actual adding process
 const handleAddToTrip = async (trip: Trip) => {
+   // Stop if this campsite is already in the trip
+  if ((trip.campsite_ids ?? []).includes(campsite!.campsite_id)) {
+    window.alert("Campsite already in trip");
+    return;
+  }
   setAddingToTrip(true);
   try {
     const updatedIds = [...(trip.campsite_ids ?? []), campsite!.campsite_id];
@@ -271,6 +277,12 @@ const handleAddToTrip = async (trip: Trip) => {
       : typeof campsite.amenities === "string" && campsite.amenities
       ? campsite.amenities.split(",").map((a) => a.trim()).filter(Boolean)
       : [];
+  
+  // Set to true when the user owns the campsite
+  const isOwner =
+  !!authUser?.sub &&
+  !!campsite?.creator_id &&
+  authUser.sub === campsite.creator_id;
 
   // UI: Displays campsite title with edit and delete buttons and current editing state
   return (
@@ -281,12 +293,16 @@ const handleAddToTrip = async (trip: Trip) => {
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={styles.title}>{campsite.name}</Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
+          {isOwner && (
+            <>
             <Pressable onPress={handleEditOpen} style={[styles.actionButton, { backgroundColor: "#3b82f6" }]}>
               <Text style={styles.actionButtonText}>Edit</Text>
             </Pressable>
             <Pressable onPress={handleDelete} style={[styles.actionButton, { backgroundColor: "#ef4444" }]}>
               <Text style={styles.actionButtonText}>Delete</Text>
             </Pressable>
+            </>
+          )}
             <Pressable
                 onPress={handleAddToTripOpen}
                 disabled={!authReady || !authUser?.sub}

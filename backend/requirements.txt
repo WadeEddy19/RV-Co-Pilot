@@ -2,3 +2,5 @@ Flask
 pymongo[srv]
 python-dotenv
 flask-cors
+python-jose
+requests
